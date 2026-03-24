@@ -1,0 +1,17 @@
+{
+    "name": "HealthTrackAI",
+    "short_name": "HealthTrack",
+    "description": "Intelligent Health Companion — AI Lab Report Analysis",
+    "start_url": "/?mode=standalone",
+    "display": "standalone",
+    "background_color": "#080D18",
+    "theme_color": "#00C9A7",
+    "icons": [
+        {
+            "src": "https://cdn-icons-png.flaticon.com/512/2864/2864350.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
