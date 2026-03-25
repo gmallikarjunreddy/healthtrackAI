@@ -906,11 +906,14 @@ elif st.session_state.current_page == "upload":
     url_input = st.text_input("Enter URL of report image or PDF", placeholder="https://example.com/my-report.png")
     url_btn = st.button("📥 Download & Analyze", use_container_width=False, type="secondary")
 
-    to_process = [] # List of (bytes, filename)
+    if "to_process" not in st.session_state:
+        st.session_state.to_process = []
 
     if uploaded:
+        already_names = [f[1] for f in st.session_state.to_process]
         for f in uploaded:
-            to_process.append((f.read(), f.name))
+            if f.name not in already_names:
+                st.session_state.to_process.append((f.read(), f.name))
     
     if url_btn and url_input:
         with st.spinner("📥 Downloading file from URL..."):
@@ -918,10 +921,11 @@ elif st.session_state.current_page == "upload":
             if err:
                 st.error(err)
             else:
-                to_process.append((data, fname))
+                st.session_state.to_process.append((data, fname))
+                st.success(f"Downloaded: {fname}")
 
-    if to_process:
-        for file_bytes, filename in to_process:
+    if st.session_state.to_process:
+        for i, (file_bytes, filename) in enumerate(st.session_state.to_process):
             ext = filename.split(".")[-1].upper()
             st.markdown(f"""
             <div class="report-card" style="margin-top:16px">
@@ -932,7 +936,7 @@ elif st.session_state.current_page == "upload":
 
             col_a, col_b = st.columns([3, 1])
             with col_b:
-                go = st.button("🔍 Analyze Now", key=f"go_{filename}", type="primary", use_container_width=True)
+                go = st.button("🔍 Analyze Now", key=f"go_{filename}_{i}", type="primary", use_container_width=True)
 
             if go:
                 progress_bar = st.progress(0, text="📖 Reading file…")
@@ -1006,7 +1010,7 @@ elif st.session_state.current_page == "upload":
                     questions = get_agent().suggest_questions(report_type)
                     qc = st.columns(2)
                     for qi, q in enumerate(questions):
-                        if qc[qi%2].button(q, key=f"fq_{f.name}_{qi}", use_container_width=True):
+                        if qc[qi%2].button(q, key=f"fq_{filename}_{qi}", use_container_width=True):
                             with st.spinner("🧬 Thinking..."):
                                 reply = get_agent().chat(q, [], analysis[:600])
                             _save_chat("user", q)

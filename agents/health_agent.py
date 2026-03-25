@@ -107,16 +107,18 @@ class HealthAgent:
 REPORT CONTENT:
 {text[:5500]}
 
-Give the complete structured analysis. Include the SCORE JSON at the end."""
+Give the complete structured analysis. Include the SCORE JSON at the end as EXACTLY:
+SCORE:{{"overall":number,"vitals":number,"nutrition":number,"risk":number,"label":"string","summary":"string"}}"""
         try:
             resp = self._get_analysis_model().generate_content(prompt)
-            result = self._parse_response(resp.text)
+            raw_text = resp.text
             
             # 🩺 Rule-Based Pricing Engine
-            meds = get_medicine_suggestions(result["analysis"])
+            meds = get_medicine_suggestions(raw_text)
             if meds:
-                result["analysis"] += format_medicine_table(meds)
-                
+                raw_text += "\n\n" + format_medicine_table(meds)
+            
+            result = self._parse_response(raw_text)
             return result
         except Exception as e:
             return {"analysis": f"❌ Analysis error: {e}\n\nCheck GOOGLE_API_KEY in .env",
@@ -124,15 +126,26 @@ Give the complete structured analysis. Include the SCORE JSON at the end."""
 
     def _parse_response(self, raw: str) -> dict:
         score, breakdown = 70, {"vitals": 70, "nutrition": 65, "risk": 40, "label": "Fair Health", "summary": ""}
-        m = re.search(r'SCORE:\s*(\{[^}]+\})', raw)
+        
+        # Look for SCORE: line or JSON block
+        m = re.search(r'SCORE:\s*(\{.*?\})', raw, re.DOTALL)
         if m:
             try:
-                d = json.loads(m.group(1))
+                # Clean up any potential markdown formatting in the match
+                clean_json = m.group(1).replace('```json', '').replace('```', '').strip()
+                d = json.loads(clean_json)
                 score = d.get("overall", 70)
-                breakdown = {k: d.get(k, v) for k, v in breakdown.items()}
-                raw = raw[:m.start()].strip()
+                # Filter breakdown to only includes keys we expect
+                valid_keys = ["vitals", "nutrition", "risk", "label", "summary"]
+                breakdown = {k: d.get(k, breakdown[k]) for k in valid_keys if k in d}
+                # Remove the SCORE line from the analysis text
+                raw = raw[:m.start()] + raw[m.end():]
             except Exception:
                 pass
+        
+        # Strip trailing "HEALTH_SCORE_JSON" or other markers
+        raw = re.sub(r'HEALTH_SCORE_JSON.*', '', raw, flags=re.DOTALL).strip()
+        
         return {"analysis": raw.strip(), "health_score": score, "breakdown": breakdown, "error": None}
 
     # ── Chat ───────────────────────────────────────────────────────────────────

@@ -146,15 +146,25 @@ def extract_from_url(url: str) -> tuple[bytes, str, str]:
         resp = requests.get(url, timeout=12, stream=True)
         resp.raise_for_status()
 
-        # Try to get filename from URL
-        fname = url.split("/")[-1].split("?")[0]
-        if not fname or "." not in fname:
-            # Fallback based on content-type
-            ctype = resp.headers.get("content-type", "").lower()
-            ext = ".jpg"
-            if "png" in ctype: ext = ".png"
-            elif "pdf" in ctype: ext = ".pdf"
-            fname = f"downloaded_report_{int(os.path.getmtime(__file__))}{ext}"
+        # Try to get filename from content-disposition
+        cd = resp.headers.get("Content-Disposition", "")
+        if "filename=" in cd:
+            fname = re.findall("filename=(.+)", cd)[0].strip('"')
+        else:
+            # Try to get filename from URL
+            fname = url.split("/")[-1].split("?")[0]
+            if not fname or "." not in fname:
+                # Fallback based on content-type
+                ctype = resp.headers.get("content-type", "").lower()
+                ext = ".pdf" if "pdf" in ctype else ".jpg"
+                if "png" in ctype: ext = ".png"
+                elif "bmp" in ctype: ext = ".bmp"
+                elif "webp" in ctype: ext = ".webp"
+                elif "docx" in ctype: ext = ".docx"
+                elif "text" in ctype or "plain" in ctype: ext = ".txt"
+                
+                from time import time
+                fname = f"downloaded_report_{int(time())}{ext}"
         
         return resp.content, fname, ""
     except Exception as e:
